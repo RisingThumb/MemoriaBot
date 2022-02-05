@@ -12,7 +12,7 @@ client.commands = new Collection();
 const distube = new DisTube(client, {
     searchSongs: 10,
     searchCooldown: 30,
-    leaveOnEmpty: false,
+    leaveOnEmpty: true,
     leaveOnFinish: false,
     leaveOnStop: false,
     plugins: [new SoundCloudPlugin(), new SpotifyPlugin()]
@@ -79,12 +79,15 @@ client.on('interactionCreate', async interaction => {
         if (!queue) {
             interaction.channel.send("Nothing playing right now!")
         } else {
-            const mode = distube.setRepeatMode(interaction);
+            const mode = queue.repeatMode;
+            let message = "off"
+            if (mode === 1) message = "Repeating single song";
+            if (mode === 2) message = "Repeating queue";
             interaction.channel.send(
                 `Current queue:\n${queue.songs
                     .map((song, id) => `**${id ? id : "Playing"}**. ${song.name} - \`${song.formattedDuration}\``)
                     .slice(0, 10)
-                    .join("\n")}`
+                    .join("\n")}\nLooping mode: ${message}`
             )
         }
         await interaction.reply({content: 'Queue listed.', ephemeral: true});
@@ -168,11 +171,11 @@ client.on('interactionCreate', async interaction => {
 distube
     .on("playSong", (queue, song) =>
         queue.textChannel.send(
-            `Playing \`${song.name}\` - \`${song.formattedDuration}\`\nRequested by: ${song.user}`
+            `Playing \`${song.name}\` - \`${song.formattedDuration}\``
         )
     )
     .on("addSong", (queue, song) =>
-        queue.textChannel.send(`Added ${song.name} - \`${song.formattedDuration}\` to the queue by ${song.user}`)
+        queue.textChannel.send(`Added ${song.name} - \`${song.formattedDuration}\` to the queue`)
     )
     .on("addList", (queue, playlist) =>
         queue.textChannel.send(
