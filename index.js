@@ -1,12 +1,14 @@
 const fs = require('fs');
-const { Client, Collection, Intents } = require('discord.js');
-const { token, games } = require('./config.json');
+const { Client, Collection, GatewayIntentBits } = require('discord.js');
+const { token } = require('./config.json');
 const child_process = require("child_process");
-const  { DisTube } = require("distube");
+const { DisTube } = require("distube");
 const { SoundCloudPlugin } = require("@distube/soundcloud")
 const { SpotifyPlugin } = require("@distube/spotify")
 
-const client = new Client({ intents: [Intents.FLAGS.GUILDS, "GUILD_VOICE_STATES", "GUILD_MESSAGES"] });
+const client = new Client({ intents: [  GatewayIntentBits.Guilds,
+                                        GatewayIntentBits.GuildVoiceStates,
+                                        GatewayIntentBits.GuildMessages] });
 client.commands = new Collection();
 
 const distube = new DisTube(client, {
@@ -17,20 +19,12 @@ const distube = new DisTube(client, {
     leaveOnStop: false,
     plugins: [new SoundCloudPlugin(), new SpotifyPlugin()]
 })
-const prefix = '!';
 
 const commandFiles = fs.readdirSync('./commands').filter(file => file.endsWith('.js'));
 
 for (const file of commandFiles) {
     const command = require(`./commands/${file}`);
     client.commands.set(command.data.name, command);
-}
-
-
-function killAllServices() {
-    for (var i = 0; i < games.length; i++) {
-        child_process.exec("sudo systemctl stop "+games[i]["value"]+".service");
-    }
 }
 
 client.once('ready', () => {
@@ -46,13 +40,6 @@ client.on('interactionCreate', async interaction => {
 		await interaction.reply('Pong!');
         return;
 	}
-    if (commandName === 'server') {
-        let serverValue = interaction.options.getString('server');
-        killAllServices();
-        child_process.exec("sudo systemctl start "+serverValue+".service");
-        await interaction.reply("Starting "+serverValue+". Please be patient...")
-        return;
-    }
     if (commandName === 'stop') {
         killAllServices();
         await interaction.reply("Thank you for closing the server and preventing resources going to waste :^)");
@@ -139,18 +126,26 @@ client.on('interactionCreate', async interaction => {
     }
 
     if (commandName === 'roll') {
-        let number = interaction.options.getInteger('number');
-        let dice = interaction.options.getInteger('dice');
-        if (number > 33) {
-            await interaction.reply("Too many dice rolled!");
+        let diceRoll = interaction.options.getString('dice_roll');
+        let diceReadable = diceRoll.trim().toLowerCase().replace('+','d').split('d');
+        if (diceReadable.length <2 || diceReadable.length>3) {
+            await interaction.reply("Incorrect formatting.");
             return;
         }
-        if (number < 0) {
-            await interaction.reply("Less than 0 dice rolled? Huh??");
-            return;
+
+        let number = diceReadable[0];
+        let dice = diceReadable[1];
+        let modifier = 0
+        if (diceReadable.length == 3) {
+            modifier = diceReadable[2];
         }
-        if (dice < 0) {
-            await interaction.reply("The dice you are trying to roll doesn't exist in reality...");
+        let stringDice = "";
+        let showResult = true;
+        if (number > 10 || dice > 1000000) {
+            showResult = false;
+        }
+        if (number <= 0 || dice <= 0) {
+            await interaction.reply("Impossible dice!");
             return;
         }
         diceToPrint = [];
@@ -158,10 +153,18 @@ client.on('interactionCreate', async interaction => {
             var roll = Math.floor(dice * Math.random()) + 1;
             diceToPrint.push(roll);
         }
-        let stringDice = "";
-        for (let diceRolled of diceToPrint) {
-            stringDice += `Rolled a ${diceRolled} with a d${dice}\n`;
+        if (showResult) {
+            stringDice = "Rolled the following: [";
+            result = 0
+            for (let diceRolled of diceToPrint) {
+                stringDice += `${diceRolled}, `
+                result += diceRolled
+            }
+            stringDice=stringDice.slice(0, -2);
+            stringDice += ']\n'
         }
+        result += parseInt(modifier)
+        stringDice += `Result: ${result}`
         await interaction.reply(stringDice);
         return;
     }
